@@ -9,7 +9,7 @@ Screenshots: `screenshots/executive_summary.png` and
 
 The workbook is built from the processed tables in
 `../data/processed/` using the separate Tableau Build Pack guide
-(local-only, not in this repo — see the delivery note). That guide
+(kept locally, not published in this repo). That guide
 gives the exact sheets, calculated fields and dashboard layout for:
 
 - Page 1 — Executive Summary (KPI cards, monthly revenue trend,
