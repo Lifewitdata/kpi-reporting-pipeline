@@ -24,7 +24,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from databricks import sql
-from databricks.sdk.core import Config
 from databricks.sdk.errors import DatabricksError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,19 +98,20 @@ def main() -> None:
             for filename, (table, timestamp_cols) in FILES.items():
                 local = RAW / filename
                 remote = f"{volume_root}/{filename}"
-                workspace.files.upload(remote, str(local), overwrite=True)
+                workspace.files.upload_from(remote, str(local), overwrite=True)
                 # read_files handles multiline review text; the CSV schema
                 # is inferred by Spark and known timestamp fields are parsed.
                 timestamp_expr = ", ".join(
                     f"to_timestamp(`{col}`) AS `{col}`" for col in timestamp_cols
                 )
-                projection = f"* EXCEPT ({', '.join(f'`{c}`' for c in timestamp_cols)})"
+                quoted_timestamp_cols = ", ".join("`" + col + "`" for col in timestamp_cols)
+                projection = f"* EXCEPT ({quoted_timestamp_cols})"
                 if timestamp_expr:
                     projection += ", " + timestamp_expr
                 create = (
                     f"CREATE OR REPLACE TABLE `{catalog}`.`{schema}`.`{table}` AS "
                     f"SELECT {projection} FROM read_files('{remote}', "
-                    "format => 'csv', header => true, inferSchema => true, "
+                    "format => 'csv', header => true, inferColumnTypes => true, "
                     "multiLine => true, quote => '\"', escape => '\"')"
                 )
                 statement(cur, create)
