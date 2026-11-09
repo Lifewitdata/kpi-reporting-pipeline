@@ -105,7 +105,7 @@ def main() -> None:
                     f"to_timestamp(`{col}`) AS `{col}`" for col in timestamp_cols
                 )
                 quoted_timestamp_cols = ", ".join("`" + col + "`" for col in timestamp_cols)
-                projection = f"* EXCEPT ({quoted_timestamp_cols})"
+                projection = f"* EXCEPT ({quoted_timestamp_cols})" if quoted_timestamp_cols else "*"
                 if timestamp_expr:
                     projection += ", " + timestamp_expr
                 create = (
