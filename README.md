@@ -89,6 +89,66 @@ runs the quality checks, and exports `data/processed/`:
 
 To explore first: `notebooks/01_eda.ipynb` (49 cells, executed).
 
+## Ad-hoc requests (Sales-style, on e-commerce data)
+
+Six one-off commercial questions, each recorded as *asked* → *clarified*
+→ query → plain-language answer: `docs/ad-hoc-requests.md`. The queries
+are reusable and live in `sql/ad-hoc/01…06`; they read the reporting
+tables, not the raw CSVs. Run any of them without a database:
+
+```bash
+python src/run_adhoc.py       # all six
+python src/run_adhoc.py 02    # just "which states are late?"
+```
+
+Examples: revenue by category last month, late deliveries by state,
+review score for late vs on-time orders, São Paulo vs the rest,
+value tied up in cancellations, Black Friday 2017. The data is Olist
+**e-commerce**, not CRM — the requests are Sales-style, the dataset is
+not a sales pipeline.
+
+## Spreadsheet (Excel)
+
+`spreadsheets/Olist_KPI_Spreadsheet.xlsx` — clean data sheets, three
+**native PivotTables** (by month, by order category, by item category),
+XLOOKUP and INDEX/MATCH order lookup, and validated month/category
+dropdowns. Rebuild with `python src/build_spreadsheet.py` (needs desktop
+Excel). Guide: `spreadsheets/README.md`.
+
+**Verified in Excel:** both order-level pivots total **R$ 15,422,461.77**
+and 99,441 orders, matching the SQL exactly; the item-revenue pivot
+totals R$ 13,221,498.11. The workbook's Checks sheet holds seven live
+formulas comparing it with the SQL totals — all seven read `MATCH`.
+
+![Spreadsheet checks](spreadsheets/screenshots/checks.png)
+
+## Using this without SQL
+
+- `docs/self-service-guide.md` — get monthly revenue, orders and on-time
+  rate from the dashboard filters, the spreadsheet, or the CSV.
+- `sql/README.md` — every query and the question it answers.
+
+## Running and supporting it
+
+- `docs/operations-runbook.md` — weekly refresh steps, what PASS /
+  WARNING / INFO mean, and what to do when a check warns.
+- `docs/escalation-log.md` — the real data issues: what was fixed, what
+  was excluded, what was escalated, and the DQ check that evidences it.
+
+## Not done yet (stated plainly)
+
+- **Databricks — not run.** A Spark SQL port of `01`–`03` plus a
+  reconciliation query is prepared in `sql/databricks/`, and
+  `python src/check_databricks_port.py` confirms it reproduces all 11
+  headline metrics when transpiled and run locally. **It has never been
+  executed on a Databricks warehouse.** `docs/databricks-run.md` holds
+  the run steps and an empty receipt; it stays empty until a real run.
+- **Count — no access, nothing built.** No canvas exists and none is
+  claimed. If access is obtained, the intended canvas is monthly
+  revenue, orders and on-time rate from `data/processed/kpi_monthly.csv`.
+- **Alteryx — described, not built.** The architecture note explains the
+  equivalent flow; no Alteryx workflow has been run.
+
 ## Key insights (3–4 bullets; full version in `docs/insights.md`)
 
 - **Late deliveries cut review scores from 4.29 to 2.57 (−40.2%).**
@@ -102,7 +162,7 @@ To explore first: `notebooks/01_eda.ipynb` (49 cells, executed).
 
 ## Data quality issues found
 
-- 551 orders have duplicate reviews — latest review kept.
+- 551 surplus review rows across 547 orders — latest review kept.
 - 8 delivered orders have no delivery date — excluded from delivery
   KPIs, not imputed.
 - 610 products missing category/name/description; 2 categories with

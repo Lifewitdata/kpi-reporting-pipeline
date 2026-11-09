@@ -27,8 +27,12 @@ YYYY-MM from `order_purchase_timestamp`).
   delivery date.** They are not counted as late and their delivery time
   is not imputed. The denominator is therefore 96,470 dated delivered
   orders, not 96,478.
-- **Review score uses the latest review per order.** 551 orders have more
-  than one review row; averaging all rows would double-count those orders.
+- **Review score uses the latest review per order.** 547 orders have more
+  than one review row (551 surplus rows); averaging all rows would
+  double-count those orders. For 31 of them the latest timestamp is
+  tied between reviews with different scores, so the pick is arbitrary;
+  the average moves only in the 4th decimal (4.1556–4.1562). Open item
+  E4 in `escalation-log.md`.
 - **Category revenue is item price, not payment_value.** Category totals
   come from `category_monthly.csv` (order_items × products). Summing
   payment_value at item grain would double-count multi-item orders.

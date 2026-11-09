@@ -2,3 +2,14 @@ pandas
 sqlalchemy
 matplotlib
 jupyter
+
+# src/run_adhoc.py (markdown output)
+tabulate
+
+# src/build_spreadsheet.py (Windows + desktop Excel)
+openpyxl
+pywin32; sys_platform == 'win32'
+
+# src/check_databricks_port.py (local equivalence check only)
+duckdb
+sqlglot

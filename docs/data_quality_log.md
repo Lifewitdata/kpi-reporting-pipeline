@@ -25,7 +25,8 @@ compares pandas row counts, not line counts.
 
 ## Issues
 
-1. **Duplicate reviews — 551 orders with more than one review row.**
+1. **Duplicate reviews — 551 surplus rows across 547 orders.**
+   (99,224 review rows, 98,673 distinct orders.)
    Fix: keep the latest review by `review_creation_date`
    (`ROW_NUMBER()` in `02_master_table.sql`). Result: 98,673 orders
    with a review, 95,832 of them delivered.
@@ -72,11 +73,23 @@ compares pandas row counts, not line counts.
 12. **No duplicate keys in orders, customers, items, payments,
     products or sellers.** Verified; the master-table grain check
     (`master_duplicate_order_id = 0`) passes.
+13. **Tied latest reviews — 31 delivered orders, open.** Two or more
+    reviews share the same latest `review_creation_date` with different
+    scores, so "keep the latest" picks arbitrarily. Check
+    `tied_latest_review_orders` raises a WARNING on every refresh.
+    Impact measured: the average moves between 4.1556 and 4.1562, so the
+    published 4.16 is unaffected. Raised as E4 in `escalation-log.md`
+    rather than silently resolved.
 
 ## Checks that run on every refresh
 
 See `sql/04_data_quality_checks.sql` and `src/quality_checks.py`:
 row-count match raw → clean → master, null keys = 0, duplicate
 order_id = 0, negative revenue = 0, negative payments = 0, plus a
-per-table load count. A WARNING is logged to `logs/pipeline_run.log`
-and does not silently pass.
+per-table load count. Three further checks report known properties of
+this extract: `surplus_review_rows` (551, INFO),
+`delivered_without_payment` (1, INFO) and `tied_latest_review_orders`
+(31, WARNING). A WARNING is logged to `logs/pipeline_run.log` and does
+not silently pass. What each status means and what to do next:
+`operations-runbook.md`. Who each issue was raised with:
+`escalation-log.md`.
