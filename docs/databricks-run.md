@@ -1,92 +1,73 @@
-# Databricks run — NOT RUN YET
+# Databricks execution
 
-**Status: the pipeline has never been executed on Databricks.** This
-project runs on SQLite. Do not describe Databricks as a tool used on
-this project, on a resume or in an interview, until the run below is
-done and this page is filled in with real values and a screenshot.
+This run path executes against a real Databricks SQL warehouse; unlike
+`src/check_databricks_port.py`, it does not emulate Spark SQL locally.
 
-What exists today is a **prepared, locally validated port** — not a
-Databricks run.
+## Prerequisites
 
-## What is in the repo
+- A Databricks workspace with a running SQL warehouse.
+- A personal access token (or supported token) able to use the warehouse,
+  create schemas/tables/volumes, and upload files to Unity Catalog.
+- Unity Catalog enabled and permission to create/use the configured catalog,
+  schema, and volume.
+- The nine Olist CSVs in `data/raw/` (see `docs/data_dictionary.md`).
 
-| File | Purpose |
-|---|---|
-| `sql/databricks/00_load_raw.py` | Notebook cell: load the 9 CSVs from a Unity Catalog volume into tables, casting timestamps |
-| `sql/databricks/01_clean_orders.sql` | Spark SQL port of `sql/01_clean_orders.sql` |
-| `sql/databricks/02_master_table.sql` | Spark SQL port of `sql/02_master_table.sql` |
-| `sql/databricks/03_kpi_monthly.sql` | Spark SQL port of `sql/03_kpi_monthly.sql` |
-| `sql/databricks/04_reconcile.sql` | 11 metrics compared with the SQLite pipeline; every row must read MATCH |
-| `src/check_databricks_port.py` | Local equivalence check (see below) |
+## Configure
 
-Ported differences: `strftime` → `date_format`, `date()` → `to_date`,
-`julianday` subtraction → `unix_timestamp` subtraction / 86400,
-`CAST(… AS REAL)` → `CAST(… AS DOUBLE)`, `DROP` + `CREATE` →
-`CREATE OR REPLACE TABLE`. The join and KPI logic is unchanged.
+Install dependencies:
 
-## What has been verified locally (2026-11-09)
+```bash
+pip install -r requirements.txt
+```
 
-`python src/check_databricks_port.py` transpiles the three Spark SQL
-files to DuckDB with sqlglot, runs them on the raw CSVs, and executes
-`04_reconcile.sql`. All 11 metrics matched the SQLite pipeline:
+Set these environment variables. Do not commit credentials:
 
-| Metric | Value |
-|---|---|
-| clean_orders / master_orders / distinct order_id | 99,441 |
-| Delivered orders | 96,478 |
-| Revenue | 15,422,461.77 |
-| Delivered item price | 13,221,498.11 |
-| kpi_monthly months | 25 |
-| On-time rate | 91.89% |
-| Average delivery days | 12.56 |
-| Average review score | 4.16 |
-| Delivered without delivery date | 8 |
+| Variable | Required | Example |
+|---|---:|---|
+| `DATABRICKS_SERVER_HOSTNAME` | Yes | `adb-<workspace-id>.<number>.azuredatabricks.net` (hostname only or URL) |
+| `DATABRICKS_HTTP_PATH` | Yes | SQL warehouse HTTP path from warehouse connection details |
+| `DATABRICKS_TOKEN` | Yes | Workspace access token |
+| `DATABRICKS_CATALOG` | No | `main` |
+| `DATABRICKS_SCHEMA` | No | `kpi` |
+| `DATABRICKS_VOLUME` | No | `raw` |
+| `DATABRICKS_VOLUME_ROOT` | No | Defaults to `/Volumes/<catalog>/<schema>/<volume>` |
 
-**This proves the SQL logic is equivalent. It does not prove the files
-execute on a Databricks SQL warehouse** — different engine, different
-parser, different runtime. That is what the run below is for.
+PowerShell example:
 
-## How to do the run (Databricks Free Edition)
+```powershell
+$env:DATABRICKS_SERVER_HOSTNAME = "adb-xxxxxxxxxxxxxxxx.x.azuredatabricks.net"
+$env:DATABRICKS_HTTP_PATH = "/sql/1.0/warehouses/xxxxxxxxxxxxxxxx"
+$env:DATABRICKS_TOKEN = "<your-token>"
+python scripts/run_databricks.py
+```
 
-1. Sign in to Databricks Free Edition and open a **SQL warehouse**
-   (Serverless starter warehouse is fine).
-2. Upload the 9 Kaggle CSVs to a Unity Catalog volume, e.g.
-   `/Volumes/main/kpi/raw/`. Create the schema and volume first if they
-   do not exist.
-3. Create a notebook, paste `sql/databricks/00_load_raw.py`, adjust
-   `CATALOG` / `SCHEMA`, attach the warehouse and run it. Confirm the
-   printed row counts match `docs/data_dictionary.md`.
-4. Run `01_clean_orders.sql`, then `02_master_table.sql`, then
-   `03_kpi_monthly.sql` in the SQL editor, in that order, in the same
-   schema.
-5. Run `04_reconcile.sql`. **Every row must say MATCH.** If one says
-   DIFF, stop and investigate before writing anything up — the likely
-   causes are timestamp inference in step 3 or the tie-break note below.
-6. Screenshot the reconciliation result and the query history showing
-   the three files, save them into `docs/`, and fill in the receipt.
+macOS/Linux:
 
-### Two things that can legitimately differ
+```bash
+export DATABRICKS_SERVER_HOSTNAME="adb-xxxxxxxxxxxxxxxx.x.azuredatabricks.net"
+export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/xxxxxxxxxxxxxxxx"
+export DATABRICKS_TOKEN="<your-token>"
+python scripts/run_databricks.py
+```
 
-- **Review average, 4th decimal.** 31 delivered orders have two reviews
-  with the same latest timestamp and different scores, so `ROW_NUMBER`
-  breaks the tie arbitrarily (`docs/escalation-log.md`, E4). The
-  reconciliation compares to 2 decimals (4.16) for that reason. Order
-  counts and revenue must match exactly.
-- **On-time comparison.** The estimate is midnight, so a delivery later
-  on the promised day counts as late. The port compares full timestamps
-  to preserve that. Changing one side to `to_date()` moves the rate.
+The runner creates the schema and volume if permitted, uploads all nine CSVs,
+creates/replaces the raw tables, runs SQL 01–03, and checks the 11 expected
+reconciliation metrics using SQL 04. It writes
+`docs/databricks-run-receipt.json` only after all 11 rows report `MATCH`.
+A failed run exits non-zero and does not overwrite the prior successful receipt.
 
-## Run receipt — fill in only after a real run
+## Validation boundaries
 
-| Field | Value |
-|---|---|
-| Date run | _not run_ |
-| Databricks edition / workspace | _not run_ |
-| SQL warehouse name and size | _not run_ |
-| Catalog.schema | _not run_ |
-| Files executed | `01_clean_orders.sql`, `02_master_table.sql`, `03_kpi_monthly.sql` |
-| master_orders rows | _not run_ (expected 99,441) |
-| Revenue | _not run_ (expected R$ 15,422,461.77) |
-| Reconciliation | _not run_ (expected 11/11 MATCH) |
-| Screenshot | _not saved_ — add `docs/databricks-reconciliation.png` |
-| Run by | _not run_ |
+- `python src/check_databricks_port.py` is a **local DuckDB equivalence test**.
+- `python scripts/run_databricks.py` is the **real warehouse execution**.
+- Never claim a Databricks run based on the local test alone.
+- The receipt records UTC timestamps, workspace hostname, warehouse HTTP path,
+  catalog/schema, volume, raw-table row counts and reconciliation details.
+  Review it before claiming successful execution.
+
+## Expected results
+
+The reconciliation expects 11/11 MATCH, including 99,441 clean/master rows,
+96,478 delivered orders, R$15,422,461.77 delivered revenue, 25 monthly rows,
+91.89% on-time delivery, 12.56 average delivery days, 4.16 average review
+score and 8 delivered orders without a delivery date.
