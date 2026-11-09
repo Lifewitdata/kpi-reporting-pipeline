@@ -112,7 +112,7 @@ def main() -> None:
                     f"CREATE OR REPLACE TABLE `{catalog}`.`{schema}`.`{table}` AS "
                     f"SELECT {projection} FROM read_files('{remote}', "
                     "format => 'csv', header => true, inferColumnTypes => true, "
-                    "multiLine => true, quote => '\"', escape => '\"')"
+                    "multiLine => true, quote => '\"', escape => '\"')"', escape => '\"')"
                 )
                 statement(cur, create)
                 rows = statement(
