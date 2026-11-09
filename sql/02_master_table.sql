@@ -8,9 +8,10 @@
 -- the order grain and double-count payment_value if summed. Payments
 -- and items are therefore summed per order_id in CTEs first.
 --
--- Why the latest review only: 551 orders have more than one review
--- row. Keeping every review row would duplicate the order; the
--- latest review by review_creation_date is kept (see data quality log).
+-- Why the latest review only: 547 orders have more than one review
+-- row (551 surplus rows). Keeping every review row would duplicate the
+-- order; the latest review by review_creation_date is kept (see data
+-- quality log, and escalation-log.md E4 for the tied-timestamp case).
 --
 -- Product category is NOT in this table on purpose: category lives at
 -- item grain, not order grain. Category revenue is aggregated

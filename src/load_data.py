@@ -8,11 +8,15 @@ transformation is visible and reviewable. Run standalone with
 import logging
 
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from config import DATA_RAW, DB_PATH, TABLES
 
 logger = logging.getLogger(__name__)
+
+# to_sql creates no indexes, and the DQ checks look payments and reviews
+# up per order_id. Without these, that lookup is a full scan per order.
+INDEX_COLUMNS = {"order_payments": "order_id", "order_reviews": "order_id"}
 
 
 def load_data() -> dict:
@@ -29,6 +33,13 @@ def load_data() -> dict:
             )
         df = pd.read_csv(path)
         df.to_sql(table, engine, if_exists="replace", index=False)
+        if table in INDEX_COLUMNS:
+            column = INDEX_COLUMNS[table]
+            with engine.begin() as conn:
+                conn.execute(
+                    text(f'CREATE INDEX IF NOT EXISTS "ix_{table}_{column}" '
+                         f'ON "{table}" ("{column}")')
+                )
         counts[table] = len(df)
         logger.info("Loaded %s: %s rows -> table '%s'", csv_name, len(df), table)
     return counts

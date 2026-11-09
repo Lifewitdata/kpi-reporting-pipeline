@@ -51,4 +51,45 @@ UNION ALL
 SELECT 'kpi_monthly_months',
        (SELECT COUNT(*) FROM kpi_monthly),
        CASE WHEN (SELECT COUNT(*) FROM kpi_monthly) > 0
-            THEN 'PASS' ELSE 'WARNING' END;
+            THEN 'PASS' ELSE 'WARNING' END
+UNION ALL
+SELECT 'surplus_review_rows',
+       (SELECT COUNT(*) FROM order_reviews WHERE review_score IS NOT NULL)
+         - (SELECT COUNT(DISTINCT order_id) FROM order_reviews
+            WHERE review_score IS NOT NULL),
+       -- Known value in this extract: 551 surplus review rows across
+       -- 547 orders. Handled by review_latest in 02_master_table.sql,
+       -- which keeps one review per order. See escalation-log.md E1.
+       'INFO'
+UNION ALL
+SELECT 'tied_latest_review_orders',
+       (SELECT COUNT(*) FROM (
+            SELECT order_id,
+                   COUNT(*) AS top_rows,
+                   COUNT(DISTINCT review_score) AS distinct_scores
+            FROM (
+                SELECT order_id, review_score, review_creation_date,
+                       MAX(review_creation_date) OVER (
+                           PARTITION BY order_id
+                       ) AS latest_date
+                FROM order_reviews
+                WHERE review_score IS NOT NULL
+            )
+            WHERE review_creation_date = latest_date
+            GROUP BY order_id
+            HAVING top_rows > 1 AND distinct_scores > 1
+        )),
+       -- Orders whose latest review date is shared by reviews with
+       -- different scores, so "keep the latest" is a coin flip for them
+       -- and avg_review_score is not deterministic. Open, E4.
+       'WARNING'
+UNION ALL
+SELECT 'delivered_without_payment',
+       (SELECT COUNT(*) FROM master_orders AS m
+        WHERE m.is_delivered = 1
+          AND NOT EXISTS (SELECT 1 FROM order_payments AS p
+                          WHERE p.order_id = m.order_id)),
+       -- Known value in this extract: 1 (Sep 2016), counted as R$ 0
+       -- revenue. Documented in escalation-log.md E3 so the R$ 0.00
+       -- month is not read as a pipeline bug.
+       'INFO';
