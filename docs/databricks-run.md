@@ -1,38 +1,42 @@
 # Databricks execution
 
-This run path executes against a real Databricks SQL warehouse; unlike
-`src/check_databricks_port.py`, it does not emulate Spark SQL locally.
+The repository includes a runner that submits the Spark SQL port to a
+real Databricks SQL warehouse. The DuckDB-based checker remains a local
+equivalence test and is not a substitute for live execution.
 
-## Prerequisites
+## Prerequisites and permissions
 
-- A Databricks workspace with a running SQL warehouse.
-- A personal access token (or supported token) able to use the warehouse,
-  create schemas/tables/volumes, and upload files to Unity Catalog.
-- Unity Catalog enabled and permission to create/use the configured catalog,
-  schema, and volume.
-- The nine Olist CSVs in `data/raw/` (see `docs/data_dictionary.md`).
+The Databricks identity used for the run needs:
+- permission to use the SQL warehouse;
+- permission to create/use the target catalog schema and managed volume;
+- permission to create or replace tables in the schema;
+- permission to upload files to and read files from the Unity Catalog volume.
 
-## Configure
+Unity Catalog must be enabled. The default target is `main.kpi.raw`.
 
-Install dependencies:
+## Run locally
+
+Download the nine source files listed in `docs/data_dictionary.md` from
+the [Olist Kaggle dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
+into `data/raw/`. Then install:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Set these environment variables. Do not commit credentials:
+Set these environment variables. Never commit the token:
 
-| Variable | Required | Example |
+| Variable | Required | Default / example |
 |---|---:|---|
-| `DATABRICKS_SERVER_HOSTNAME` | Yes | `adb-<workspace-id>.<number>.azuredatabricks.net` (hostname only or URL) |
-| `DATABRICKS_HTTP_PATH` | Yes | SQL warehouse HTTP path from warehouse connection details |
-| `DATABRICKS_TOKEN` | Yes | Workspace access token |
+| `DATABRICKS_SERVER_HOSTNAME` | Yes | `adb-<workspace-id>.<number>.azuredatabricks.net` |
+| `DATABRICKS_HTTP_PATH` | Yes | `/sql/1.0/warehouses/<warehouse-id>` |
+| `DATABRICKS_TOKEN` | Yes | Workspace token |
 | `DATABRICKS_CATALOG` | No | `main` |
 | `DATABRICKS_SCHEMA` | No | `kpi` |
 | `DATABRICKS_VOLUME` | No | `raw` |
-| `DATABRICKS_VOLUME_ROOT` | No | Defaults to `/Volumes/<catalog>/<schema>/<volume>` |
+| `DATABRICKS_VOLUME_ROOT` | No | `/Volumes/main/kpi/raw` |
 
-PowerShell example:
+PowerShell:
 
 ```powershell
 $env:DATABRICKS_SERVER_HOSTNAME = "adb-xxxxxxxxxxxxxxxx.x.azuredatabricks.net"
@@ -50,24 +54,44 @@ export DATABRICKS_TOKEN="<your-token>"
 python scripts/run_databricks.py
 ```
 
-The runner creates the schema and volume if permitted, uploads all nine CSVs,
-creates/replaces the raw tables, runs SQL 01–03, and checks the 11 expected
-reconciliation metrics using SQL 04. It writes
-`docs/databricks-run-receipt.json` only after all 11 rows report `MATCH`.
-A failed run exits non-zero and does not overwrite the prior successful receipt.
+The runner uploads the nine CSVs to the Unity Catalog volume, creates or
+replaces their source tables, runs `01_clean_orders.sql`,
+`02_master_table.sql`, and `03_kpi_monthly.sql`, then executes
+`04_reconcile.sql`. It exits non-zero unless all 11 rows report MATCH.
+The JSON receipt is written only after the complete run passes.
 
-## Validation boundaries
+## GitHub Actions (manual live run)
 
-- `python src/check_databricks_port.py` is a **local DuckDB equivalence test**.
-- `python scripts/run_databricks.py` is the **real warehouse execution**.
-- Never claim a Databricks run based on the local test alone.
-- The receipt records UTC timestamps, workspace hostname, warehouse HTTP path,
-  catalog/schema, volume, raw-table row counts and reconciliation details.
-  Review it before claiming successful execution.
+The workflow `.github/workflows/databricks.yml` is triggered with
+**Actions → Databricks SQL validation → Run workflow**. Configure these
+repository secrets first:
 
-## Expected results
+- `KAGGLE_API_TOKEN`: Kaggle API token used to download the public Olist dataset;
+- `DATABRICKS_SERVER_HOSTNAME`;
+- `DATABRICKS_HTTP_PATH`;
+- `DATABRICKS_TOKEN`.
 
-The reconciliation expects 11/11 MATCH, including 99,441 clean/master rows,
-96,478 delivered orders, R$15,422,461.77 delivered revenue, 25 monthly rows,
-91.89% on-time delivery, 12.56 average delivery days, 4.16 average review
-score and 8 delivered orders without a delivery date.
+Optional repository variables: `DATABRICKS_CATALOG`, `DATABRICKS_SCHEMA`,
+and `DATABRICKS_VOLUME`. Defaults are `main`, `kpi`, and `raw`.
+The workflow downloads source data, executes against the warehouse, uploads
+the receipt as a workflow artifact, and commits a successful receipt to the
+branch selected when the workflow is started. Repository rules may require
+that the receipt commit be made through a pull request instead.
+
+## Evidence and validation boundaries
+
+- `python src/check_databricks_port.py`: local DuckDB/Spark-SQL equivalence only.
+- `python scripts/run_databricks.py`: actual Databricks SQL warehouse run.
+- The receipt records status, UTC timestamps, workspace host, SQL HTTP path,
+  catalog/schema, volume, raw input row counts, and all 11 reconciliation
+  results. It does not contain the access token.
+- Do not claim Databricks execution until the receipt says `PASS` and all
+  11 metrics say `MATCH`.
+
+## Expected reconciliation
+
+The query expects 11/11 MATCH, including 99,441 clean/master rows,
+96,478 delivered orders, R$15,422,461.77 delivered revenue,
+R$13,221,498.11 delivered item price, 25 monthly rows,
+91.89% on-time delivery, 12.56 average delivery days, 4.16 average
+review score, and 8 delivered orders without a delivery date.
