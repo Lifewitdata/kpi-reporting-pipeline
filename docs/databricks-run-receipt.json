@@ -1,0 +1,5 @@
+{
+  "status": "NOT_RUN",
+  "executed_on_databricks": false,
+  "note": "No real Databricks warehouse execution has been recorded yet. Run python scripts/run_databricks.py with valid workspace credentials to generate a PASS receipt."
+}
