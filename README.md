@@ -135,14 +135,18 @@ formulas comparing it with the SQL totals — all seven read `MATCH`.
 - `docs/escalation-log.md` — the real data issues: what was fixed, what
   was excluded, what was escalated, and the DQ check that evidences it.
 
-## Not done yet (stated plainly)
+## Platform validation status
 
-- **Databricks — not run.** A Spark SQL port of `01`–`03` plus a
-  reconciliation query is prepared in `sql/databricks/`, and
-  `python src/check_databricks_port.py` confirms it reproduces all 11
-  headline metrics when transpiled and run locally. **It has never been
-  executed on a Databricks warehouse.** `docs/databricks-run.md` holds
-  the run steps and an empty receipt; it stays empty until a real run.
+- **Databricks — execution path implemented; live run pending.** The
+  Spark SQL port is in `sql/databricks/`. Run
+  `python scripts/run_databricks.py` with a configured Databricks SQL
+  warehouse and Unity Catalog access to upload the nine source CSVs,
+  execute the three SQL transformations, and enforce all 11
+  reconciliation checks. The manual GitHub Actions workflow
+  `.github/workflows/databricks.yml` can do the same using repository
+  secrets. The checked-in receipt remains `NOT_RUN` until a real
+  warehouse execution passes; the DuckDB check is local validation
+  only. Setup and permissions: `docs/databricks-run.md`.
 - **Count — no access, nothing built.** No canvas exists and none is
   claimed. If access is obtained, the intended canvas is monthly
   revenue, orders and on-time rate from `data/processed/kpi_monthly.csv`.

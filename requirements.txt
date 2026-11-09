@@ -13,3 +13,7 @@ pywin32; sys_platform == 'win32'
 # src/check_databricks_port.py (local equivalence check only)
 duckdb
 sqlglot
+
+# Real Databricks SQL warehouse execution
+databricks-sql-connector
+databricks-sdk>=0.72.0,<0.73.0
