@@ -1,0 +1,27 @@
+name: Databricks SQL validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Databricks runner dependencies
+        run: python -m pip install databricks-sql-connector databricks-sdk
+      - name: Run against Databricks SQL warehouse
+        env:
+          DATABRICKS_SERVER_HOSTNAME: ${{ secrets.DATABRICKS_SERVER_HOSTNAME }}
+          DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_CATALOG: ${{ vars.DATABRICKS_CATALOG || 'main' }}
+          DATABRICKS_SCHEMA: ${{ vars.DATABRICKS_SCHEMA || 'kpi' }}
+          DATABRICKS_VOLUME: ${{ vars.DATABRICKS_VOLUME || 'raw' }}
+        run: python scripts/run_databricks.py
